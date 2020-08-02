@@ -23,7 +23,7 @@ impl Display for PrettyPrintableFloat {
 
         // Create some variables to hold the numbers that go before
         // the radix point and after the radix point.
-        let mut pre_radix_point = 1u64;
+        let mut pre_radix_point = 0u64;
         let mut post_radix_point: f64 = 0f64;
 
         // Create a boolean to hold whether the value printed is
@@ -36,7 +36,21 @@ impl Display for PrettyPrintableFloat {
         // Create a variable to hold the exponent. This is biased
         // by 127 in ieee754 to account for that, too. Also, cast
         // to u32 so that we can use it in a for loop later.
-        let exponent = (f_bits.to_be_bytes()[0] - 127) as u32;
+
+        let mut exponent = f_bits.to_be_bytes()[0] as u32;
+
+        if exponent == 0 {
+            // we are denormalized, all bets are off!
+        } else {
+            assert!(exponent >= 127);
+
+            // In normalized representation, the pre radix point is always
+            // implicitly 1. So, make it so here.
+            pre_radix_point = 1;
+
+            // we can now safely assume that there is bias
+            exponent = exponent - 127;
+        }
 
         // shift off the exponent bits.
         f_bits <<= 8;
@@ -54,15 +68,23 @@ impl Display for PrettyPrintableFloat {
         // by 2).
         // 3. (conditionally) set the value in the space to be 1 if the bit
         // that we shifted from the mantissa is a 1.
-        // 4. Shift off the bit that we just considered.
+        // 4. In all cases, put the values into the mantissa string for
+        // printing; they are technically part of the mantissa even though
+        // we are using them in the pre radix.
+        // 5. Shift off the bit that we just considered.
         for _ in 0..exponent {
             // (1), (2)
             pre_radix_point <<= 1;
             // (3)
             if f_bits < 0 {
+                // (4)
+                mantissa += &format!("1");
                 pre_radix_point |= 1;
+            } else {
+                // (4)
+                mantissa += &format!("1");
             }
-            // (4)
+            // (5)
             f_bits <<= 1;
         }
 
@@ -116,5 +138,7 @@ fn main() {
     pp = PrettyPrintableFloat::new(9.5);
     println!("{}", pp);
     pp = PrettyPrintableFloat::new(10.3);
+    println!("{}", pp);
+    pp = PrettyPrintableFloat::new(0f32);
     println!("{}", pp);
 }
